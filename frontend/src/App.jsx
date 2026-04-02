@@ -15,8 +15,10 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || '')
   const [role, setRole] = useState(localStorage.getItem('role') || '')
   const [message, setMessage] = useState('')
+  const [isError, setIsError] = useState(false)
   const [activeTab, setActiveTab] = useState('records')
 
+  const [authPage, setAuthPage] = useState('login')
   const [registerForm, setRegisterForm] = useState({ name: '', email: '', password: '', role: 'viewer' })
   const [loginForm, setLoginForm] = useState({ email: '', password: '' })
 
@@ -39,27 +41,38 @@ function App() {
 
   const onRegister = async (event) => {
     event.preventDefault()
+    const { name, email, password } = registerForm
+    if (!name.trim() || name.trim().length < 2) { setIsError(true); return setMessage('Name must be at least 2 characters') }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setIsError(true); return setMessage('Enter a valid email address') }
+    if (password.length < 6) { setIsError(true); return setMessage('Password must be at least 6 characters') }
     try {
       await registerUser(registerForm)
+      setIsError(false)
       setMessage('Registered successfully. Please login.')
       setRegisterForm({ name: '', email: '', password: '', role: 'viewer' })
+      setAuthPage('login')
     } catch (error) {
-      setMessage(error.response?.data?.message || 'Register failed')
+      setIsError(true)
+      setMessage(error.response?.data?.message || 'Registration failed. Please try again.')
     }
   }
 
   const onLogin = async (event) => {
     event.preventDefault()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginForm.email)) { setIsError(true); return setMessage('Enter a valid email address') }
+    if (!loginForm.password) { setIsError(true); return setMessage('Password is required') }
     try {
       const data = await loginUser(loginForm)
       setToken(data.token)
       setRole(data.role)
       localStorage.setItem('token', data.token)
       localStorage.setItem('role', data.role)
+      setIsError(false)
       setMessage('Logged in successfully')
       setLoginForm({ email: '', password: '' })
     } catch (error) {
-      setMessage(error.response?.data?.message || 'Login failed')
+      setIsError(true)
+      setMessage(error.response?.data?.message || 'Login failed. Please try again.')
     }
   }
 
@@ -87,24 +100,30 @@ function App() {
 
   const onRecordSubmit = async (event) => {
     event.preventDefault()
+    if (!recordForm.amount || isNaN(recordForm.amount) || Number(recordForm.amount) <= 0)
+      { setIsError(true); return setMessage('Amount must be a positive number') }
+    if (!recordForm.category.trim()) { setIsError(true); return setMessage('Category is required') }
     try {
       if (editRecordId) {
         await updateRecord(token, editRecordId, {
           ...recordForm,
           amount: Number(recordForm.amount),
         })
+        setIsError(false)
         setMessage('Record updated')
       } else {
         await createRecord(token, {
           ...recordForm,
           amount: Number(recordForm.amount),
         })
+        setIsError(false)
         setMessage('Record created')
       }
       setEditRecordId('')
       setRecordForm({ amount: '', type: 'income', category: '', note: '' })
       await loadRecords()
     } catch (error) {
+      setIsError(true)
       setMessage(error.response?.data?.message || 'Record action failed')
     }
   }
@@ -161,74 +180,103 @@ function App() {
 
   return (
     <main className="container">
-      <h1>Finance Dashboard UI</h1>
+      <header className="app-header">
+        <h1>Finance Dashboard</h1>
+        <p>Manage your income, expenses & analytics</p>
+      </header>
 
-      <p className="message">{message}</p>
+      <p className={`message ${isError ? 'message-error' : ''}`}>{message}</p>
 
       {!token ? (
-        <section className="grid two-col">
-          <form className="card" onSubmit={onRegister}>
-            <h2>Register</h2>
-            <input placeholder="Name" value={registerForm.name} onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })} required />
-            <input type="email" placeholder="Email" value={registerForm.email} onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })} required />
-            <input type="password" placeholder="Password" value={registerForm.password} onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })} required />
-            <select value={registerForm.role} onChange={(e) => setRegisterForm({ ...registerForm, role: e.target.value })}>
-              <option value="viewer">viewer</option>
-              <option value="analyst">analyst</option>
-              <option value="admin">admin</option>
-            </select>
-            <button type="submit">Register</button>
-          </form>
-
-          <form className="card" onSubmit={onLogin}>
-            <h2>Login</h2>
-            <input type="email" placeholder="Email" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} required />
-            <input type="password" placeholder="Password" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} required />
-            <button type="submit">Login</button>
-          </form>
-        </section>
+        <div className="auth-wrapper">
+          {authPage === 'login' ? (
+            <form className="card auth-card" onSubmit={onLogin}>
+              <h2><span className="icon">🔐</span> Sign In</h2>
+              <label>Email</label>
+              <input type="email" placeholder="john@example.com" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} required />
+              <label>Password</label>
+              <input type="password" placeholder="••••••" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} required />
+              <button type="submit">Sign In</button>
+              <p className="auth-switch">Don't have an account? <span onClick={() => { setAuthPage('register'); setMessage(''); }}>Create one</span></p>
+            </form>
+          ) : (
+            <form className="card auth-card" onSubmit={onRegister}>
+              <h2><span className="icon">📝</span> Create Account</h2>
+              <label>Full Name</label>
+              <input placeholder="John Doe" value={registerForm.name} onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })} required />
+              <label>Email</label>
+              <input type="email" placeholder="john@example.com" value={registerForm.email} onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })} required />
+              <label>Password</label>
+              <input type="password" placeholder="••••••" value={registerForm.password} onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })} required />
+              <label>Role</label>
+              <select value={registerForm.role} onChange={(e) => setRegisterForm({ ...registerForm, role: e.target.value })}>
+                <option value="viewer">Viewer</option>
+                <option value="analyst">Analyst</option>
+                <option value="admin">Admin</option>
+              </select>
+              <button type="submit">Create Account</button>
+              <p className="auth-switch">Already have an account? <span onClick={() => { setAuthPage('login'); setMessage(''); }}>Sign in</span></p>
+            </form>
+          )}
+        </div>
       ) : (
         <>
-          <section className="card top-row">
-            <p><strong>Role:</strong> {role}</p>
-            <button onClick={onLogout}>Logout</button>
+          <section className="top-bar">
+            <div className="user-info">
+              <div className="avatar">{role[0]?.toUpperCase()}</div>
+              <div>
+                <strong>Welcome back!</strong>
+                <span className="role-badge">{role}</span>
+              </div>
+            </div>
+            <button className="btn-logout" onClick={onLogout}>Logout</button>
           </section>
 
           <section className="tabs">
-            <button className={activeTab === 'records' ? 'active' : ''} onClick={() => setActiveTab('records')}>Records</button>
+            <button className={activeTab === 'records' ? 'active' : ''} onClick={() => setActiveTab('records')}>📋 Records</button>
             {(isAnalyst || isAdmin) && (
-              <button className={activeTab === 'dashboard' ? 'active' : ''} onClick={() => setActiveTab('dashboard')}>Dashboard</button>
+              <button className={activeTab === 'dashboard' ? 'active' : ''} onClick={() => setActiveTab('dashboard')}>📊 Dashboard</button>
             )}
             {isAdmin && (
-              <button className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')}>Users</button>
+              <button className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')}>👥 Users</button>
             )}
           </section>
 
           {activeTab === 'records' && (
             <section className="grid two-col">
               <div className="card">
-                <h2>Record Filters</h2>
-                <input placeholder="Type (income/expense)" value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })} />
-                <input placeholder="Category" value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })} />
-                <button onClick={loadRecords}>Load Records</button>
+                <h2><span className="icon">🔍</span> Filter Records</h2>
+                <label>Type</label>
+                <select value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })}>
+                  <option value="">All Types</option>
+                  <option value="income">Income</option>
+                  <option value="expense">Expense</option>
+                </select>
+                <label>Category</label>
+                <input placeholder="e.g. Salary, Food, Rent" value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })} />
+                <button className="btn-secondary" onClick={loadRecords}>Apply Filters</button>
               </div>
 
               {isAdmin && (
                 <form className="card" onSubmit={onRecordSubmit}>
-                  <h2>{editRecordId ? 'Update Record' : 'Create Record'}</h2>
-                  <input type="number" placeholder="Amount" value={recordForm.amount} onChange={(e) => setRecordForm({ ...recordForm, amount: e.target.value })} required />
+                  <h2><span className="icon">{editRecordId ? '✏️' : '➕'}</span> {editRecordId ? 'Update Record' : 'New Record'}</h2>
+                  <label>Amount</label>
+                  <input type="number" placeholder="0.00" value={recordForm.amount} onChange={(e) => setRecordForm({ ...recordForm, amount: e.target.value })} required />
+                  <label>Type</label>
                   <select value={recordForm.type} onChange={(e) => setRecordForm({ ...recordForm, type: e.target.value })}>
-                    <option value="income">income</option>
-                    <option value="expense">expense</option>
+                    <option value="income">Income</option>
+                    <option value="expense">Expense</option>
                   </select>
-                  <input placeholder="Category" value={recordForm.category} onChange={(e) => setRecordForm({ ...recordForm, category: e.target.value })} required />
-                  <input placeholder="Note" value={recordForm.note} onChange={(e) => setRecordForm({ ...recordForm, note: e.target.value })} />
-                  <button type="submit">{editRecordId ? 'Save Changes' : 'Create'}</button>
+                  <label>Category</label>
+                  <input placeholder="e.g. Salary" value={recordForm.category} onChange={(e) => setRecordForm({ ...recordForm, category: e.target.value })} required />
+                  <label>Note</label>
+                  <input placeholder="Optional description" value={recordForm.note} onChange={(e) => setRecordForm({ ...recordForm, note: e.target.value })} />
+                  <button type="submit">{editRecordId ? 'Save Changes' : 'Add Record'}</button>
                 </form>
               )}
 
               <div className="card full-width">
-                <h2>Records</h2>
+                <h2><span className="icon">📄</span> Records ({records.length})</h2>
                 <div className="table-wrap">
                   <table>
                     <thead>
@@ -243,21 +291,25 @@ function App() {
                     <tbody>
                       {records.map((record) => (
                         <tr key={record._id}>
-                          <td>{record.amount}</td>
-                          <td>{record.type}</td>
+                          <td className={`amount amount-${record.type}`}>
+                            {record.type === 'income' ? '+' : '-'}{record.amount}
+                          </td>
+                          <td><span className={`badge badge-${record.type}`}>{record.type}</span></td>
                           <td>{record.category}</td>
-                          <td>{record.note}</td>
+                          <td>{record.note || '—'}</td>
                           {isAdmin && (
                             <td>
-                              <button onClick={() => onEditRecord(record)}>Edit</button>
-                              <button onClick={() => onDeleteRecord(record._id)}>Delete</button>
+                              <div className="btn-group">
+                                <button className="btn-edit" onClick={() => onEditRecord(record)}>Edit</button>
+                                <button className="btn-delete" onClick={() => onDeleteRecord(record._id)}>Delete</button>
+                              </div>
                             </td>
                           )}
                         </tr>
                       ))}
                       {!records.length && (
-                        <tr>
-                          <td colSpan={isAdmin ? 5 : 4}>No records found</td>
+                        <tr className="empty-row">
+                          <td colSpan={isAdmin ? 5 : 4}>No records found. {isAdmin ? 'Create one above!' : ''}</td>
                         </tr>
                       )}
                     </tbody>
@@ -268,34 +320,50 @@ function App() {
           )}
 
           {activeTab === 'dashboard' && (isAnalyst || isAdmin) && (
-            <section className="grid two-col">
-              <div className="card">
-                <h2>Summary</h2>
-                <button onClick={loadDashboard}>Load Dashboard</button>
+            <section>
+              <div className="card" style={{ marginBottom: 20 }}>
+                <h2><span className="icon">📊</span> Financial Summary</h2>
+                <button onClick={loadDashboard} style={{ marginBottom: 16 }}>Load Dashboard</button>
                 {summary && (
-                  <ul>
-                    <li>Total Income: {summary.totalIncome}</li>
-                    <li>Total Expense: {summary.totalExpense}</li>
-                    <li>Net Balance: {summary.netBalance} ({netLabel})</li>
-                  </ul>
+                  <div className="stats-grid">
+                    <div className="stat-card income">
+                      <div className="stat-label">Total Income</div>
+                      <div className="stat-value">+{summary.totalIncome}</div>
+                    </div>
+                    <div className="stat-card expense">
+                      <div className="stat-label">Total Expense</div>
+                      <div className="stat-value">-{summary.totalExpense}</div>
+                    </div>
+                    <div className="stat-card balance">
+                      <div className="stat-label">Net Balance</div>
+                      <div className="stat-value">{summary.netBalance}</div>
+                    </div>
+                  </div>
                 )}
               </div>
 
               <div className="card">
-                <h2>Category Totals</h2>
-                <ul>
-                  {categoryData.map((item) => (
-                    <li key={item._id}>{item._id}: {item.total}</li>
-                  ))}
-                </ul>
+                <h2><span className="icon">🏷️</span> Category Breakdown</h2>
+                {categoryData.length ? (
+                  <ul className="category-list">
+                    {categoryData.map((item) => (
+                      <li className="category-item" key={item._id}>
+                        <span className="category-name">{item._id}</span>
+                        <span className="category-total">{item.total}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p style={{ color: '#94a3b8', fontSize: 14 }}>Click "Load Dashboard" to view data</p>
+                )}
               </div>
             </section>
           )}
 
           {activeTab === 'users' && isAdmin && (
             <section className="card">
-              <h2>Users (Admin)</h2>
-              <button onClick={loadUsers}>Load Users</button>
+              <h2><span className="icon">👥</span> All Users</h2>
+              <button onClick={loadUsers} style={{ marginBottom: 16 }}>Load Users</button>
               <div className="table-wrap">
                 <table>
                   <thead>
@@ -303,18 +371,23 @@ function App() {
                       <th>Name</th>
                       <th>Email</th>
                       <th>Role</th>
-                      <th>Active</th>
+                      <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {users.map((user) => (
                       <tr key={user._id}>
-                        <td>{user.name}</td>
+                        <td><strong>{user.name}</strong></td>
                         <td>{user.email}</td>
-                        <td>{user.role}</td>
-                        <td>{user.isActive ? 'Yes' : 'No'}</td>
+                        <td><span className="badge badge-income">{user.role}</span></td>
+                        <td><span className={user.isActive ? 'status-active' : 'status-inactive'}>{user.isActive ? '● Active' : '● Inactive'}</span></td>
                       </tr>
                     ))}
+                    {!users.length && (
+                      <tr className="empty-row">
+                        <td colSpan={4}>Click "Load Users" to view data</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
