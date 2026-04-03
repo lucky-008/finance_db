@@ -1,6 +1,6 @@
-const Record = require("../models/Record");
+import Record from "../models/Record.js";
 
-exports.createRecord = async (req, res) => {
+export const createRecord = async (req, res) => {
   const { amount, type, category } = req.body;
 
   if (amount == null || isNaN(amount) || Number(amount) <= 0)
@@ -16,7 +16,7 @@ exports.createRecord = async (req, res) => {
   res.json(record);
 };
 
-exports.getRecords = async (req, res) => {
+export const getRecords = async (req, res) => {
   const { type, category } = req.query;
 
   const filter = { isDeleted: false };
@@ -27,7 +27,7 @@ exports.getRecords = async (req, res) => {
   res.json(records);
 };
 
-exports.updateRecord = async (req, res) => {
+export const updateRecord = async (req, res) => {
   const { amount, type, category } = req.body;
 
   if (amount != null && (isNaN(amount) || Number(amount) <= 0))
@@ -44,7 +44,7 @@ exports.updateRecord = async (req, res) => {
   res.json(record);
 };
 
-exports.deleteRecord = async (req, res) => {
+export const deleteRecord = async (req, res) => {
   await Record.findByIdAndUpdate(req.params.id, { isDeleted: true });
   res.json({ message: "Deleted" });
 };

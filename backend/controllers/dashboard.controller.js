@@ -1,6 +1,6 @@
-const Record = require("../models/Record");
+import Record from "../models/Record.js";
 
-exports.summary = async (req, res) => {
+export const summary = async (req, res) => {
   const data = await Record.aggregate([
     { $match: { isDeleted: false } },
     {
@@ -24,7 +24,7 @@ exports.summary = async (req, res) => {
   });
 };
 
-exports.category = async (req, res) => {
+export const category = async (req, res) => {
   const data = await Record.aggregate([
     { $match: { isDeleted: false } },
     {

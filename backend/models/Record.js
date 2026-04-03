@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const recordSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
@@ -10,4 +10,4 @@ const recordSchema = new mongoose.Schema({
   isDeleted: { type: Boolean, default: false }
 });
 
-module.exports = mongoose.model("Record", recordSchema);
+export default mongoose.model("Record", recordSchema);

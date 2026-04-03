@@ -1,9 +1,11 @@
-const router = require("express").Router();
-const auth = require("../middleware/auth");
-const role = require("../middleware/role");
-const ctrl = require("../controllers/dashboard.controller");
+import { Router } from "express";
+import auth from "../middleware/auth.js";
+import role from "../middleware/role.js";
+import { summary, category } from "../controllers/dashboard.controller.js";
 
-router.get("/summary", auth, role("analyst", "admin"), ctrl.summary);
-router.get("/category", auth, role("analyst", "admin"), ctrl.category);
+const router = Router();
 
-module.exports = router;
+router.get("/summary", auth, role("analyst", "admin"), summary);
+router.get("/category", auth, role("analyst", "admin"), category);
+
+export default router;
