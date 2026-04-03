@@ -24,4 +24,16 @@ export const summary = async (req, res) => {
   });
 };
 
+export const category = async (req, res) => {
+  const data = await Record.aggregate([
+    { $match: { isDeleted: false } },
+    {
+      $group: {
+        _id: "$category",
+        total: { $sum: "$amount" }
+      }
+    }
+  ]);
 
+  res.json(data);
+};
