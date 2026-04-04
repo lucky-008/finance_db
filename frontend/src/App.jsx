@@ -44,7 +44,12 @@ function App() {
     const { name, email, password } = registerForm
     if (!name.trim() || name.trim().length < 2) { setIsError(true); return setMessage('Name must be at least 2 characters') }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setIsError(true); return setMessage('Enter a valid email address') }
-    if (password.length < 6) { setIsError(true); return setMessage('Password must be at least 6 characters') }
+    if (password.length < 7) { setIsError(true); return setMessage('Password must be greater than 6 characters') }
+    if (!/[A-Z]/.test(password)) { setIsError(true); return setMessage('Password must contain at least one uppercase letter') }
+    if (!/[a-z]/.test(password)) { setIsError(true); return setMessage('Password must contain at least one lowercase letter') }
+    if (!/[0-9]/.test(password)) { setIsError(true); return setMessage('Password must contain at least one digit') }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) { setIsError(true); return setMessage('Password must contain at least one special character') }
+    if (password.toLowerCase().includes(name.trim().toLowerCase())) { setIsError(true); return setMessage('Password must not be similar to your name') }
     try {
       await registerUser(registerForm)
       setIsError(false)
