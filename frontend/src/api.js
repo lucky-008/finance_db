@@ -68,3 +68,16 @@ export const getDashboardCategory = async (token) => {
   const { data } = await client.get('/dashboard/category', authHeader(token))
   return data
 }
+
+export const getDashboardRecent = async (token) => {
+  const { data } = await client.get('/dashboard/recent', authHeader(token))
+  return data
+}
+
+export const getDashboardTrends = async (token, period = 'monthly') => {
+  const { data } = await client.get('/dashboard/trends', {
+    ...authHeader(token),
+    params: { period },
+  })
+  return data
+}

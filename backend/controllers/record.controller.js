@@ -22,14 +22,33 @@ export const createRecord = async (req, res) => {
 
 export const getRecords = async (req, res) => {
   try {
-    const { type, category } = req.query;
+    const { type, category, search, page = 1, limit = 10 } = req.query;
 
     const filter = { isDeleted: false };
     if (type) filter.type = type;
     if (category) filter.category = category;
+    if (search) {
+      filter.$or = [
+        { category: { $regex: search, $options: 'i' } },
+        { note: { $regex: search, $options: 'i' } }
+      ];
+    }
 
-    const records = await Record.find(filter);
-    res.json(records);
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit)));
+    const skip = (pageNum - 1) * limitNum;
+
+    const [records, total] = await Promise.all([
+      Record.find(filter).sort({ date: -1 }).skip(skip).limit(limitNum),
+      Record.countDocuments(filter)
+    ]);
+
+    res.json({
+      records,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitNum)
+    });
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch records" });
   }

@@ -3,6 +3,8 @@ import {
   createRecord,
   getDashboardCategory,
   getDashboardSummary,
+  getDashboardRecent,
+  getDashboardTrends,
   getRecords,
   getUsers,
   loginUser,
@@ -25,11 +27,16 @@ function App() {
   const [records, setRecords] = useState([])
   const [recordForm, setRecordForm] = useState({ amount: '', type: 'income', category: '', note: '' })
   const [editRecordId, setEditRecordId] = useState('')
-  const [filters, setFilters] = useState({ type: '', category: '' })
+  const [filters, setFilters] = useState({ type: '', category: '', search: '' })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
 
   const [users, setUsers] = useState([])
   const [summary, setSummary] = useState(null)
   const [categoryData, setCategoryData] = useState([])
+  const [recentActivity, setRecentActivity] = useState([])
+  const [trends, setTrends] = useState([])
+  const [trendPeriod, setTrendPeriod] = useState('monthly')
 
   const isAdmin = role === 'admin'
   const isAnalyst = role === 'analyst'
@@ -93,11 +100,14 @@ function App() {
     setMessage('Logged out')
   }
 
-  const loadRecords = async () => {
+  const loadRecords = async (page) => {
     try {
-      const data = await getRecords(token, filters)
-      setRecords(data)
-      setMessage('Records loaded')
+      const p = page || currentPage
+      const data = await getRecords(token, { ...filters, page: p, limit: 10 })
+      setRecords(data.records)
+      setCurrentPage(data.page)
+      setTotalPages(data.totalPages)
+      setMessage(`Records loaded (page ${data.page} of ${data.totalPages})`)
     } catch (error) {
       setMessage(error.response?.data?.message || 'Failed to load records')
     }
@@ -165,12 +175,16 @@ function App() {
 
   const loadDashboard = async () => {
     try {
-      const [summaryData, categoryStats] = await Promise.all([
+      const [summaryData, categoryStats, recent, trendsData] = await Promise.all([
         getDashboardSummary(token),
         getDashboardCategory(token),
+        getDashboardRecent(token),
+        getDashboardTrends(token, trendPeriod),
       ])
       setSummary(summaryData)
       setCategoryData(categoryStats)
+      setRecentActivity(recent)
+      setTrends(trendsData)
       setMessage('Dashboard loaded')
     } catch (error) {
       setMessage(error.response?.data?.message || 'Failed to load dashboard')
@@ -250,7 +264,9 @@ function App() {
           {activeTab === 'records' && (
             <section className="grid two-col">
               <div className="card">
-                <h2><span className="icon">🔍</span> Filter Records</h2>
+                <h2><span className="icon">🔍</span> Filter & Search Records</h2>
+                <label>Search</label>
+                <input placeholder="Search by category or note..." value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} />
                 <label>Type</label>
                 <select value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })}>
                   <option value="">All Types</option>
@@ -259,7 +275,7 @@ function App() {
                 </select>
                 <label>Category</label>
                 <input placeholder="e.g. Salary, Food, Rent" value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })} />
-                <button className="btn-secondary" onClick={loadRecords}>Apply Filters</button>
+                <button className="btn-secondary" onClick={() => { setCurrentPage(1); loadRecords(1) }}>Apply Filters</button>
               </div>
 
               {isAdmin && (
@@ -320,6 +336,11 @@ function App() {
                     </tbody>
                   </table>
                 </div>
+                <div className="pagination" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 16 }}>
+                  <button className="btn-secondary" disabled={currentPage <= 1} onClick={() => { setCurrentPage(currentPage - 1); loadRecords(currentPage - 1) }}>← Prev</button>
+                  <span>Page {currentPage} of {totalPages}</span>
+                  <button className="btn-secondary" disabled={currentPage >= totalPages} onClick={() => { setCurrentPage(currentPage + 1); loadRecords(currentPage + 1) }}>Next →</button>
+                </div>
               </div>
             </section>
           )}
@@ -358,6 +379,77 @@ function App() {
                       </li>
                     ))}
                   </ul>
+                ) : (
+                  <p style={{ color: '#94a3b8', fontSize: 14 }}>Click "Load Dashboard" to view data</p>
+                )}
+              </div>
+
+              <div className="card" style={{ marginTop: 20 }}>
+                <h2><span className="icon">🕐</span> Recent Activity</h2>
+                {recentActivity.length ? (
+                  <div className="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Amount</th>
+                          <th>Type</th>
+                          <th>Category</th>
+                          <th>Note</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recentActivity.map((r) => (
+                          <tr key={r._id}>
+                            <td>{new Date(r.date).toLocaleDateString()}</td>
+                            <td className={`amount amount-${r.type}`}>{r.type === 'income' ? '+' : '-'}{r.amount}</td>
+                            <td><span className={`badge badge-${r.type}`}>{r.type}</span></td>
+                            <td>{r.category}</td>
+                            <td>{r.note || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p style={{ color: '#94a3b8', fontSize: 14 }}>Click "Load Dashboard" to view data</p>
+                )}
+              </div>
+
+              <div className="card" style={{ marginTop: 20 }}>
+                <h2><span className="icon">📈</span> Trends</h2>
+                <div style={{ marginBottom: 12 }}>
+                  <select value={trendPeriod} onChange={(e) => setTrendPeriod(e.target.value)} style={{ marginRight: 8 }}>
+                    <option value="monthly">Monthly</option>
+                    <option value="weekly">Weekly</option>
+                  </select>
+                  <button className="btn-secondary" onClick={loadDashboard}>Refresh</button>
+                </div>
+                {trends.length ? (
+                  <div className="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Period</th>
+                          <th>Income</th>
+                          <th>Expense</th>
+                          <th>Net</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {trends.map((t) => (
+                          <tr key={t.period}>
+                            <td>{t.period}</td>
+                            <td className="amount amount-income">+{t.income}</td>
+                            <td className="amount amount-expense">-{t.expense}</td>
+                            <td style={{ fontWeight: 600, color: t.income - t.expense >= 0 ? '#22c55e' : '#ef4444' }}>
+                              {t.income - t.expense}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 ) : (
                   <p style={{ color: '#94a3b8', fontSize: 14 }}>Click "Load Dashboard" to view data</p>
                 )}
